@@ -21,6 +21,9 @@ entity top is
         fpga_refclk_p              : in    std_logic;
         fpga_refclk_n              : in    std_logic;
         
+        -- LEDs
+        gpio_led                   : out   std_logic_vector (1 downto 0);
+        
         -- SMA J95 Bank 64-12P
         ams_fpga_ref_clk           : out   std_logic
     );
@@ -36,9 +39,12 @@ signal system_clk_reset                      : std_logic;
 signal clk300                                : std_logic;
 signal clk200                                : std_logic;
 signal clk100                                : std_logic;
+signal pl_clk1                               : std_logic;
 signal user_si570_ibuf                       : std_logic;
+signal mux_out_0                             : std_logic;
+signal mux_out_1                             : std_logic;
 signal sma_conn                              : std_logic;
-signal clk_sel                               : std_logic;
+signal clk_sel                               : std_logic_vector(1 downto 0);
 
 -- Interrupts
 signal ps_interrupt                          : std_logic_vector(15 downto 3);
@@ -55,10 +61,10 @@ signal rf_axis_areset                        : std_logic;
 signal rf_axis_aresetn                       : std_logic;
     
 -- AXI-Lite Interface to the ctl_bus Adapter
-signal axi_ctl_araddr                        : std_logic_vector(39 downto 0);
+signal axi_ctl_araddr                        : std_logic_vector(31 downto 0);
 signal axi_ctl_arready                       : std_logic;
 signal axi_ctl_arvalid                       : std_logic;
-signal axi_ctl_awaddr                        : std_logic_vector(39 downto 0);
+signal axi_ctl_awaddr                        : std_logic_vector(31 downto 0);
 signal axi_ctl_awready                       : std_logic;
 signal axi_ctl_awvalid                       : std_logic;
 signal axi_ctl_bready                        : std_logic;
@@ -73,10 +79,10 @@ signal axi_ctl_wready                        : std_logic;
 signal axi_ctl_wvalid                        : std_logic;
 
 -- AXI-Lite Interface to the Stream Adapter
-signal axi_str_araddr                        : std_logic_vector(39 downto 0);
+signal axi_str_araddr                        : std_logic_vector(31 downto 0);
 signal axi_str_arready                       : std_logic;
 signal axi_str_arvalid                       : std_logic;
-signal axi_str_awaddr                        : std_logic_vector(39 downto 0);
+signal axi_str_awaddr                        : std_logic_vector(31 downto 0);
 signal axi_str_awready                       : std_logic;
 signal axi_str_awvalid                       : std_logic;
 signal axi_str_bready                        : std_logic;
@@ -262,6 +268,9 @@ begin
             rf_axis_aclk                          => rf_axis_aclk,
             rf_axis_aresetn(0)                    => rf_axis_aresetn,
             rf_axis_areset(0)                     => rf_axis_areset,
+            
+            -- PL CLK 1
+            pl_clk1                               => pl_clk1,
 
             -- DAC 0-3 NCO Update Controls
             dac0_nco_nco_update_request           => dac0_nco_nco_update_request,
@@ -347,11 +356,11 @@ begin
             user_sysref                           => user_sysref,
             
             -- Clock Mux Select
-            clk_sel(0)                            => clk_sel,
+            GPIO_0                                => clk_sel,
 
             -- FPGA Refclk (LMK04208 OUT2)
---            fpga_refclk_clk_p                     => fpga_refclk_p,
---            fpga_refclk_clk_n                     => fpga_refclk_n,
+            fpga_refclk_clk_p                     => fpga_refclk_p,
+            fpga_refclk_clk_n                     => fpga_refclk_n,
 
             -- DAC 0 Reference Clock
             dac0_clk_clk_p                        => dac0_clk_clk_p,
@@ -375,19 +384,43 @@ begin
 --------------------------------------------------------------------------------
 -- Debug SMA
 --------------------------------------------------------------------------------
-   BUFGMUX_inst : BUFGMUX
-   generic map (
-      CLK_SEL_TYPE => "SYNC"  -- ASYNC, SYNC
-   )
-   port map (
-      S  => clk_sel,        -- 1-bit input: Clock select
-      I0 => clk100,         -- 1-bit input: Clock input (S=0)
-      I1 => rf_axis_aclk,   -- 1-bit input: Clock input (S=1)
-      O  => sma_conn        -- 1-bit output: Clock output
+   BUFGMUX0_inst : BUFGMUX
+    generic map (
+        CLK_SEL_TYPE => "SYNC"  -- ASYNC, SYNC
+    )
+    port map (
+        S  => clk_sel(0),     -- 1-bit input: Clock select
+        I0 => clk100,         -- 1-bit input: Clock input (S=0)
+        I1 => pl_clk1,        -- 1-bit input: Clock input (S=1)
+        O  => mux_out_0       -- 1-bit output: Clock output
+    );
+   
+   BUFGMUX1_inst : BUFGMUX
+    generic map (
+        CLK_SEL_TYPE => "SYNC"  -- ASYNC, SYNC
+    )
+    port map (
+        S  => clk_sel(1),     -- 1-bit input: Clock select
+        I0 => clk100,         -- 1-bit input: Clock input (S=0)
+        I1 => rf_axis_aclk,   -- 1-bit input: Clock input (S=1)
+        O  => mux_out_1       -- 1-bit output: Clock output
+    );
+   
+-- Mux
+process(clk_sel) 
+    begin
+        case clk_sel is
+            when "00"   => sma_conn <= clk100;         -- clk100        100MHz
+            when "01"   => sma_conn <= pl_clk1;        -- pl_clk1       250MHz
+            when "10"   => sma_conn <= rf_axis_aclk;   -- rf_axis_aclk  360MHz
+            when others => sma_conn <= clk100;         -- pl_clk1       100MHz
+        end case;
+end process;
 
-   );
-
+-- Assignment 
 ams_fpga_ref_clk <= sma_conn;
+gpio_led(0)      <=  clk_sel(0);
+gpio_led(1)      <=  clk_sel(1);
 
 --------------------------------------------------------------------------------
     
