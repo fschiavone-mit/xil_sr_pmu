@@ -1,0 +1,7 @@
+# Vivado
+.Xil/
+pl/vivado_project/
+pl/artf/
+*.log
+*.jou
+*.str
