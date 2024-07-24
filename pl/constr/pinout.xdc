@@ -23,3 +23,11 @@ set_property IOSTANDARD  LVDS [get_ports fpga_refclk_n]
 # SMA connector J95
 set_property PACKAGE_PIN AP14 [get_ports ams_fpga_ref_clk]
 set_property IOSTANDARD LVCMOS18 [get_ports ams_fpga_ref_clk]
+
+# GPIO_LED_0 (DS11.2)
+set_property PACKAGE_PIN AR13     [get_ports gpio_led[0]]
+set_property IOSTANDARD  LVCMOS18 [get_ports gpio_led[0]]
+
+# GPIO_LED_1 (DS12.2)
+set_property PACKAGE_PIN AP13     [get_ports gpio_led[1]]
+set_property IOSTANDARD  LVCMOS18 [get_ports gpio_led[1]]
