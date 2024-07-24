@@ -1,6 +1,6 @@
 set WORK_DIR        [pwd]
 set VIVADO_ARTF_DIR ./../pl/artf/
-set XSA_NAME        xsa_24_07_24_16_07_50.xsa
+set XSA_NAME        xsa_24_07_24_18_33_12.xsa
 set XSA             ${VIVADO_ARTF_DIR}/${XSA_NAME}
 
 platform create -name {platform} \

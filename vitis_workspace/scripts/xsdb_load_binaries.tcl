@@ -1,5 +1,5 @@
 set WORK_DIR  [pwd]
-set BIT_FILE  top_24_07_24_16_07_50.bit
+set BIT_FILE  top_24_07_24_18_33_12.bit
 
 # PSU - Disable Security gates to view PMU MB target
 puts "PSU - Disable Security gates to view PMU MB target"
