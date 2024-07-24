@@ -137,6 +137,8 @@ xilinx.com:ip:usp_rf_data_converter:2.6\
 xilinx.com:ip:jtag_axi:1.2\
 xilinx.com:ip:vio:3.0\
 xilinx.com:ip:ila:6.2\
+xilinx.com:ip:clk_wiz:6.0\
+xilinx.com:ip:axi_gpio:2.0\
 "
 
    set list_ips_missing ""
@@ -295,17 +297,18 @@ proc create_root_design { parentCell } {
  ] $ps_intr
   set irq_rfdc [ create_bd_port -dir O -type intr irq_rfdc ]
   set user_sysref [ create_bd_port -dir I user_sysref ]
-  set rf_axis_aclk [ create_bd_port -dir O -type clk rf_axis_aclk ]
+  set pl_clk1 [ create_bd_port -dir O -type clk pl_clk1 ]
   set_property -dict [ list \
    CONFIG.ASSOCIATED_BUSIF {s00_axis:m00_axis:m01_axis:m02_axis:m03_axis} \
    CONFIG.ASSOCIATED_RESET {rf_axis_aresetn:rf_axis_areset} \
- ] $rf_axis_aclk
+ ] $pl_clk1
   set rf_axis_aresetn [ create_bd_port -dir O -from 0 -to 0 -type rst rf_axis_aresetn ]
   set rf_axis_areset [ create_bd_port -dir O -from 0 -to 0 -type rst rf_axis_areset ]
   set clk_adc0 [ create_bd_port -dir O -type clk clk_adc0 ]
   set clk_dac0 [ create_bd_port -dir O -type clk clk_dac0 ]
   set clk100 [ create_bd_port -dir I -type clk -freq_hz 100000000 clk100 ]
-  set clk_sel [ create_bd_port -dir O -from 0 -to 0 clk_sel ]
+  set rf_axis_aclk [ create_bd_port -dir O -type clk rf_axis_aclk ]
+  set GPIO_0 [ create_bd_port -dir O -from 1 -to 0 GPIO_0 ]
 
   # Create instance: zynq_ultra_ps_e_0, and set properties
   set zynq_ultra_ps_e_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e:3.5 zynq_ultra_ps_e_0 ]
@@ -649,7 +652,7 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   # Create instance: axi_interconnect_0, and set properties
   set axi_interconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_interconnect_0 ]
   set_property -dict [list \
-    CONFIG.NUM_MI {3} \
+    CONFIG.NUM_MI {4} \
     CONFIG.NUM_SI {2} \
   ] $axi_interconnect_0
 
@@ -717,7 +720,8 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   set vio_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:vio:3.0 vio_0 ]
   set_property -dict [list \
     CONFIG.C_NUM_PROBE_IN {0} \
-    CONFIG.C_NUM_PROBE_OUT {2} \
+    CONFIG.C_NUM_PROBE_OUT {1} \
+    CONFIG.C_PROBE_OUT0_INIT_VAL {0x1} \
   ] $vio_0
 
 
@@ -733,6 +737,33 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   # Create instance: proc_sys_reset_2, and set properties
   set proc_sys_reset_2 [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 proc_sys_reset_2 ]
 
+  # Create instance: clk_wiz_0, and set properties
+  set clk_wiz_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:clk_wiz:6.0 clk_wiz_0 ]
+  set_property -dict [list \
+    CONFIG.CLKIN1_JITTER_PS {40.0} \
+    CONFIG.CLKOUT1_JITTER {171.636} \
+    CONFIG.CLKOUT1_PHASE_ERROR {346.603} \
+    CONFIG.CLKOUT1_REQUESTED_OUT_FREQ {360} \
+    CONFIG.MMCM_CLKFBOUT_MULT_F {121.500} \
+    CONFIG.MMCM_CLKIN1_PERIOD {4.000} \
+    CONFIG.MMCM_CLKIN2_PERIOD {10.0} \
+    CONFIG.MMCM_CLKOUT0_DIVIDE_F {3.375} \
+    CONFIG.MMCM_DIVCLK_DIVIDE {25} \
+    CONFIG.PRIM_IN_FREQ {250} \
+    CONFIG.PRIM_SOURCE {Differential_clock_capable_pin} \
+    CONFIG.USE_LOCKED {false} \
+    CONFIG.USE_RESET {false} \
+  ] $clk_wiz_0
+
+
+  # Create instance: axi_gpio_0, and set properties
+  set axi_gpio_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_gpio:2.0 axi_gpio_0 ]
+  set_property -dict [list \
+    CONFIG.C_ALL_OUTPUTS {1} \
+    CONFIG.C_GPIO_WIDTH {2} \
+  ] $axi_gpio_0
+
+
   # Create interface connections
   connect_bd_intf_net -intf_net adc0_clk_0_1 [get_bd_intf_ports adc0_clk] [get_bd_intf_pins usp_rf_data_converter_0/adc0_clk]
   connect_bd_intf_net -intf_net adc0_nco_0_1 [get_bd_intf_ports adc0_nco] [get_bd_intf_pins usp_rf_data_converter_0/adc0_nco]
@@ -740,9 +771,11 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   connect_bd_intf_net -intf_net axi_interconnect_0_M00_AXI [get_bd_intf_ports m_axi_ctl] [get_bd_intf_pins axi_interconnect_0/M00_AXI]
   connect_bd_intf_net -intf_net axi_interconnect_0_M01_AXI [get_bd_intf_ports m_axi_str] [get_bd_intf_pins axi_interconnect_0/M01_AXI]
   connect_bd_intf_net -intf_net axi_interconnect_0_M02_AXI [get_bd_intf_pins axi_interconnect_0/M02_AXI] [get_bd_intf_pins usp_rf_data_converter_0/s_axi]
+  connect_bd_intf_net -intf_net axi_interconnect_0_M03_AXI [get_bd_intf_pins axi_interconnect_0/M03_AXI] [get_bd_intf_pins axi_gpio_0/S_AXI]
   connect_bd_intf_net -intf_net dac0_clk_0_1 [get_bd_intf_ports dac0_clk] [get_bd_intf_pins usp_rf_data_converter_0/dac0_clk]
   connect_bd_intf_net -intf_net dac0_nco_0_1 [get_bd_intf_ports dac0_nco] [get_bd_intf_pins usp_rf_data_converter_0/dac0_nco]
   connect_bd_intf_net -intf_net dac0_rts_0_1 [get_bd_intf_ports dac0_rts] [get_bd_intf_pins usp_rf_data_converter_0/dac0_rts]
+  connect_bd_intf_net -intf_net fpga_refclk_1 [get_bd_intf_ports fpga_refclk] [get_bd_intf_pins clk_wiz_0/CLK_IN1_D]
   connect_bd_intf_net -intf_net jtag_axi_0_M_AXI [get_bd_intf_pins jtag_axi_0/M_AXI] [get_bd_intf_pins axi_interconnect_0/S01_AXI]
   connect_bd_intf_net -intf_net s00_axis_0_1 [get_bd_intf_ports s00_axis] [get_bd_intf_pins usp_rf_data_converter_0/s00_axis]
   connect_bd_intf_net -intf_net sysref_in_0_1 [get_bd_intf_ports sysref_in] [get_bd_intf_pins usp_rf_data_converter_0/sysref_in]
@@ -756,32 +789,35 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   connect_bd_intf_net -intf_net zynq_ultra_ps_e_0_M_AXI_HPM1_FPD [get_bd_intf_pins zynq_ultra_ps_e_0/M_AXI_HPM1_FPD] [get_bd_intf_pins axi_interconnect_0/S00_AXI]
 
   # Create port connections
-  connect_bd_net -net ARESETN_1 [get_bd_pins proc_sys_reset_0/interconnect_aresetn] [get_bd_pins axi_interconnect_0/ARESETN] [get_bd_pins axi_interconnect_0/S00_ARESETN] [get_bd_pins axi_interconnect_0/M00_ARESETN] [get_bd_pins axi_interconnect_0/M01_ARESETN] [get_bd_pins axi_interconnect_0/M02_ARESETN] [get_bd_pins usp_rf_data_converter_0/s_axi_aresetn]
-  connect_bd_net -net clk100_1 [get_bd_ports clk100] [get_bd_pins jtag_axi_0/aclk] [get_bd_pins vio_0/clk] [get_bd_pins ila_0/clk] [get_bd_pins axi_interconnect_0/S01_ACLK] [get_bd_pins proc_sys_reset_2/slowest_sync_clk]
+  connect_bd_net -net ARESETN_1 [get_bd_pins proc_sys_reset_0/interconnect_aresetn] [get_bd_pins axi_interconnect_0/S00_ARESETN] [get_bd_pins axi_interconnect_0/M00_ARESETN] [get_bd_pins axi_interconnect_0/M01_ARESETN]
+  connect_bd_net -net axi_gpio_0_gpio_io_o [get_bd_pins axi_gpio_0/gpio_io_o] [get_bd_ports GPIO_0]
+  connect_bd_net -net clk100_1 [get_bd_ports clk100] [get_bd_pins jtag_axi_0/aclk] [get_bd_pins vio_0/clk] [get_bd_pins axi_interconnect_0/S01_ACLK] [get_bd_pins proc_sys_reset_2/slowest_sync_clk] [get_bd_pins axi_gpio_0/s_axi_aclk] [get_bd_pins axi_interconnect_0/M03_ACLK] [get_bd_pins usp_rf_data_converter_0/s_axi_aclk] [get_bd_pins axi_interconnect_0/ACLK] [get_bd_pins axi_interconnect_0/M02_ACLK] [get_bd_pins ila_0/clk]
+  connect_bd_net -net clk_wiz_0_clk_out1 [get_bd_pins clk_wiz_0/clk_out1] [get_bd_ports rf_axis_aclk]
   connect_bd_net -net ext_reset_in_0_1 [get_bd_ports reset] [get_bd_pins proc_sys_reset_0/ext_reset_in] [get_bd_pins proc_sys_reset_1/ext_reset_in]
   connect_bd_net -net proc_sys_reset_0_peripheral_aresetn [get_bd_pins proc_sys_reset_0/peripheral_aresetn] [get_bd_ports m_axi_aresetn] [get_bd_pins ila_0/probe1]
   connect_bd_net -net proc_sys_reset_0_peripheral_reset [get_bd_pins proc_sys_reset_0/peripheral_reset] [get_bd_ports m_axi_areset]
   connect_bd_net -net proc_sys_reset_1_peripheral_aresetn [get_bd_pins proc_sys_reset_1/peripheral_aresetn] [get_bd_ports rf_axis_aresetn] [get_bd_pins usp_rf_data_converter_0/m0_axis_aresetn] [get_bd_pins usp_rf_data_converter_0/s0_axis_aresetn] [get_bd_pins ila_0/probe2]
   connect_bd_net -net proc_sys_reset_1_peripheral_reset [get_bd_pins proc_sys_reset_1/peripheral_reset] [get_bd_ports rf_axis_areset]
-  connect_bd_net -net proc_sys_reset_2_interconnect_aresetn [get_bd_pins proc_sys_reset_2/interconnect_aresetn] [get_bd_pins axi_interconnect_0/S01_ARESETN]
-  connect_bd_net -net proc_sys_reset_2_peripheral_aresetn [get_bd_pins proc_sys_reset_2/peripheral_aresetn] [get_bd_pins jtag_axi_0/aresetn] [get_bd_pins ila_0/probe3]
+  connect_bd_net -net proc_sys_reset_2_interconnect_aresetn [get_bd_pins proc_sys_reset_2/interconnect_aresetn] [get_bd_pins axi_interconnect_0/ARESETN]
+  connect_bd_net -net proc_sys_reset_2_peripheral_aresetn [get_bd_pins proc_sys_reset_2/peripheral_aresetn] [get_bd_pins jtag_axi_0/aresetn] [get_bd_pins ila_0/probe3] [get_bd_pins axi_gpio_0/s_axi_aresetn] [get_bd_pins usp_rf_data_converter_0/s_axi_aresetn] [get_bd_pins axi_interconnect_0/M02_ARESETN] [get_bd_pins axi_interconnect_0/S01_ARESETN] [get_bd_pins axi_interconnect_0/M03_ARESETN]
   connect_bd_net -net ps_interrupt_1 [get_bd_ports ps_intr] [get_bd_pins xlslice_0/Din] [get_bd_pins xlslice_1/Din]
   connect_bd_net -net user_sysref_1 [get_bd_ports user_sysref] [get_bd_pins usp_rf_data_converter_0/user_sysref_adc] [get_bd_pins usp_rf_data_converter_0/user_sysref_dac]
   connect_bd_net -net usp_rf_data_converter_0_clk_adc0 [get_bd_pins usp_rf_data_converter_0/clk_adc0] [get_bd_ports clk_adc0]
   connect_bd_net -net usp_rf_data_converter_0_clk_dac0 [get_bd_pins usp_rf_data_converter_0/clk_dac0] [get_bd_ports clk_dac0]
   connect_bd_net -net usp_rf_data_converter_0_irq [get_bd_pins usp_rf_data_converter_0/irq] [get_bd_ports irq_rfdc]
   connect_bd_net -net vio_0_probe_out0 [get_bd_pins vio_0/probe_out0] [get_bd_pins proc_sys_reset_2/ext_reset_in]
-  connect_bd_net -net vio_0_probe_out1 [get_bd_pins vio_0/probe_out1] [get_bd_ports clk_sel]
   connect_bd_net -net xlslice_0_Dout [get_bd_pins xlslice_0/Dout] [get_bd_pins zynq_ultra_ps_e_0/pl_ps_irq0]
   connect_bd_net -net xlslice_1_Dout [get_bd_pins xlslice_1/Dout] [get_bd_pins zynq_ultra_ps_e_0/pl_ps_irq1]
-  connect_bd_net -net zynq_ultra_ps_e_0_pl_clk0 [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] [get_bd_ports m_axi_aclk] [get_bd_pins zynq_ultra_ps_e_0/maxihpm1_fpd_aclk] [get_bd_pins proc_sys_reset_0/slowest_sync_clk] [get_bd_pins axi_interconnect_0/ACLK] [get_bd_pins axi_interconnect_0/S00_ACLK] [get_bd_pins axi_interconnect_0/M00_ACLK] [get_bd_pins axi_interconnect_0/M01_ACLK] [get_bd_pins axi_interconnect_0/M02_ACLK] [get_bd_pins usp_rf_data_converter_0/s_axi_aclk]
-  connect_bd_net -net zynq_ultra_ps_e_0_pl_clk1 [get_bd_pins zynq_ultra_ps_e_0/pl_clk1] [get_bd_pins usp_rf_data_converter_0/m0_axis_aclk] [get_bd_pins usp_rf_data_converter_0/s0_axis_aclk] [get_bd_ports rf_axis_aclk] [get_bd_pins proc_sys_reset_1/slowest_sync_clk]
+  connect_bd_net -net zynq_ultra_ps_e_0_pl_clk0 [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] [get_bd_ports m_axi_aclk] [get_bd_pins zynq_ultra_ps_e_0/maxihpm1_fpd_aclk] [get_bd_pins proc_sys_reset_0/slowest_sync_clk] [get_bd_pins axi_interconnect_0/S00_ACLK] [get_bd_pins axi_interconnect_0/M00_ACLK] [get_bd_pins axi_interconnect_0/M01_ACLK]
+  connect_bd_net -net zynq_ultra_ps_e_0_pl_clk1 [get_bd_pins zynq_ultra_ps_e_0/pl_clk1] [get_bd_pins usp_rf_data_converter_0/m0_axis_aclk] [get_bd_pins usp_rf_data_converter_0/s0_axis_aclk] [get_bd_ports pl_clk1] [get_bd_pins proc_sys_reset_1/slowest_sync_clk]
   connect_bd_net -net zynq_ultra_ps_e_0_pl_resetn0 [get_bd_pins zynq_ultra_ps_e_0/pl_resetn0] [get_bd_pins proc_sys_reset_0/aux_reset_in] [get_bd_pins ila_0/probe0] [get_bd_pins proc_sys_reset_1/aux_reset_in]
 
   # Create address segments
+  assign_bd_address -offset 0xB0000000 -range 0x00010000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs axi_gpio_0/S_AXI/Reg] -force
   assign_bd_address -offset 0xB0014000 -range 0x00004000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs m_axi_ctl/Reg] -force
   assign_bd_address -offset 0xB0010000 -range 0x00004000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs m_axi_str/Reg] -force
   assign_bd_address -offset 0xB0040000 -range 0x00040000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs usp_rf_data_converter_0/s_axi/Reg] -force
+  assign_bd_address -offset 0xB0000000 -range 0x00010000 -target_address_space [get_bd_addr_spaces jtag_axi_0/Data] [get_bd_addr_segs axi_gpio_0/S_AXI/Reg] -force
   assign_bd_address -offset 0xB0014000 -range 0x00004000 -target_address_space [get_bd_addr_spaces jtag_axi_0/Data] [get_bd_addr_segs m_axi_ctl/Reg] -force
   assign_bd_address -offset 0xB0010000 -range 0x00004000 -target_address_space [get_bd_addr_spaces jtag_axi_0/Data] [get_bd_addr_segs m_axi_str/Reg] -force
   assign_bd_address -offset 0xB0040000 -range 0x00040000 -target_address_space [get_bd_addr_spaces jtag_axi_0/Data] [get_bd_addr_segs usp_rf_data_converter_0/s_axi/Reg] -force
