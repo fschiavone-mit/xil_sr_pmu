@@ -418,7 +418,8 @@ process(clk_sel)
 end process;
 
 -- Assignment 
-ams_fpga_ref_clk <= sma_conn;
+--ams_fpga_ref_clk <= sma_conn;
+ams_fpga_ref_clk <= pl_clk1;
 gpio_led(0)      <=  clk_sel(0);
 gpio_led(1)      <=  clk_sel(1);
 
