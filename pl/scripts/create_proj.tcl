@@ -29,6 +29,8 @@ update_compile_order -fileset sources_1
 add_files -fileset constrs_1 -norecurse ./constr/pinout.xdc
 update_compile_order -fileset sources_1
 
+puts "INFO: Project Creation Complete"
+
 # Build Project
 launch_runs synth_1 -jobs 8
 wait_on_run synth_1
@@ -36,3 +38,15 @@ launch_runs impl_1  -to_step write_bitstream -jobs 8
 wait_on_run impl_1
 
 puts "INFO: Build Complete"
+
+# Save bitstream
+set datetime_arr [clock format [clock seconds] -format {%y_%m_%d_%H_%M_%S}]
+set FOLDER_NAME artf
+file mkdir ./${FOLDER_NAME}/
+
+# Copy bit file from implementation folder to source controlled 'bit' directory
+file copy [glob -nocomplain ./${PROJ_DIR}/${PROJ_NAME}.runs/impl_1/*.bit] ./$FOLDER_NAME/top_${datetime_arr}.bit
+
+# Export XSA
+write_hw_platform -fixed -include_bit -force -file ./artf/xsa_${datetime_arr}.xsa
+puts "INFO: XSA Generated"
